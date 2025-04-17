@@ -166,6 +166,10 @@ def find_break_even_point(given_total: float, target_tax: float) -> float:
     high_total = given_total
     low_total = 0
 
+    # If 0 tax, we can just return the max in old regime to get the 0 tax.
+    if target_tax == 0:
+        return float(old_rebate_max_income)
+
     while high_total >= low_total:
         mid_total = (high_total + low_total) / 2
         mid_tax = old_regime_tax(mid_total)
