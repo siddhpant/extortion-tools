@@ -1,0 +1,570 @@
+# This is an example YAML file meant to explain how to make the input file for
+# foreign_sched_values_calc.py. That is, all keys are explained here by way of
+# demonstration.
+#
+# Copyright (C) 2025  Siddh Raman Pant <@siddhpant on GitHub>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+
+###############################################################################
+
+
+# Note 1: Dict key can be anything, but remember that the key will be used
+#         later for mapping back to the entry, so name it nicely.
+
+
+# Note 2: Except TTBR, do not specify in INR. Specify in native currency. The
+#         mapping will take care of linking amount -> currency, and INR value
+#         will be appropriately calculated later.
+
+
+# Note 3: The BSE/NSE situation is fairly unique to India, it seems like no
+#         stock is listed on two domestic exchanges like we have in India. So
+#         we don't support dual listings in this program.
+
+
+# Note 4: ONLY EQUITY IS SUPPORTED CURRENTLY!
+
+
+# Note 5: INDEXATION IS NOT SUPPORTED! I'm writing this in 2025, and indexation
+#         is valid only for sale < 23/07/2024. Not worth the code debt to cope
+#         for 3 months just for current AY.
+
+
+# Note 6: Tickers for cash type entities (like MMF) won't be verified.
+
+
+# Note 7: Currently, only dividend (and not interest) is supported for cash
+#         type entities.
+
+
+# Note 8: Stock splits are not supported currently. If you want support, open
+#         a PR (preferred) or issue on GitHub.
+
+
+# Note 9: Tax withholding is supported only on gain for stocks, and not on the
+#         the total amount. And misc_fees for FIFO selling / stock dividend
+#         will be divided equally among the sell transactions executed / lots
+#         receiving the dividend.
+
+
+# Note 10: Currently, only one non-zero rate of tax withholding is supported
+#          for one country, separately for dividends and stock selling. For
+#          example, you may have 2 dividends with 25% tax withheld, 1 dividend
+#          with 0 tax withheld. But you cannot have a dividend with 30% tax
+#          withheld. Same for selling, but tracked independently of dividend.
+#          If you want support, open a PR (preferred) or issue on GitHub.
+
+
+###############################################################################
+
+
+metadata:
+    # Specify the period for which you are filing taxes in YYYY-MM-DD format.
+    current_financial_year_start: 2024-04-01
+    current_financial_year_end: 2025-03-31
+    slab_rate_percent_for_stcg: 30
+
+
+###############################################################################
+
+
+countries:
+    USA:  # See "Note 1".
+        name: United States of America
+        currency: USD
+
+        # For code, either see the following PDF or see the dropdown menu in
+        # schedule FA. The value must be quoted.
+        # https://static.incometax.gov.in/iec/foservices/assets/pdf/Form_67_Instructions_to_fill_CSV_file.pdf
+        code: "2"
+
+        # See "Note 10".
+        tax_withholding_rate_percent_for_dividend: 25  # For dividends etc.
+        tax_withholding_rate_percent_for_ltcg: 0   # For LTCG only.
+        tax_withholding_rate_percent_for_stcg: 0   # For STCG only.
+
+        # We must specify DTAA article numbers, and they must be quoted.
+        # Check DTAA PDFs and find the relevant article number.
+        dtaa_article_dividend: "10"
+        dtaa_article_ltcg: "13"
+        dtaa_article_stcg: "13"
+
+        # DTAA specifies a tax rate for which you avoid double taxation. This
+        # can be different from the tax withholding rate mentioned above.
+        dtaa_tax_rate_percent_dividend: 25
+        dtaa_tax_rate_percent_ltcg: 0  # Different rates for LTCG and STCG.
+        dtaa_tax_rate_percent_stcg: 0
+
+
+
+    luteraa:  # See "Note 1".
+        name: United Kingdom Of Great Britain And Northern Ireland
+        code: "44"
+        currency: GBP
+        # Some dummy values. Do not use these!
+        tax_withholding_rate_percent_for_dividend: 12
+        tax_withholding_rate_percent_for_ltcg: 13
+        tax_withholding_rate_percent_for_stcg: 14
+        dtaa_article_dividend: "56"
+        dtaa_article_ltcg: "78"
+        dtaa_article_stcg: "79"
+        dtaa_tax_rate_percent_dividend: 10
+        dtaa_tax_rate_percent_ltcg: 15
+        dtaa_tax_rate_percent_stcg: 20
+
+    China:
+        name: China
+        code: "86"
+        currency: CNY
+        # Some dummy values. Do not use these!
+        tax_withholding_rate_percent_for_dividend: 5
+        tax_withholding_rate_percent_for_ltcg: 6
+        tax_withholding_rate_percent_for_stcg: 7
+        dtaa_article_dividend: "8"
+        dtaa_article_ltcg: "9"
+        dtaa_article_stcg: "9"
+        dtaa_tax_rate_percent_dividend: 10
+        dtaa_tax_rate_percent_ltcg: 11
+        dtaa_tax_rate_percent_stcg: 12
+
+    # and so on...
+
+###############################################################################
+
+
+# Do not modify this; This is just for your info.
+# Note that except "stock", all are a type of "fund".
+valid_entity_types:
+    - stock
+    # Note: All funds are considered as debt in Indian tax law, as of Aug 2025.
+    - etf
+    - mf
+    - cash_parking_mmf  # For MMF where your broker auto-sweeps cash. 0 gain.
+    - cash_wallet       # When your broker keeps cash with itself like Zerodha.
+
+
+entities:
+    RANDOM:  # See "Note 1".
+        entity_type: stock
+        country: USA
+        # This must be the ticker on Yahoo finance!
+        ticker: RANDOM
+        name: Random Corporation
+        # For entity_type == stock, name == company_name, since the stock is of
+        # the company itself.
+        company_name: Random Corporation
+        company_address_without_zipcode: |-
+            Some Where On Road
+            In Some Locality With Offices
+            Some City, Some State
+        company_address_zipcode: "12345"  # Must be quoted to parse as string.
+
+    STOCK:  # See "Note 1".
+        entity_type: stock
+        country: USA
+        # This must be the ticker on Yahoo finance!
+        ticker: STOCK
+        name: Stockastic Inc.
+        company_name: Stockastic Inc.
+        company_address_without_zipcode: |-
+            Else Where On Road
+            In Another Locality
+            Another City & State
+        company_address_zipcode: "67890"
+
+    # IMPORTANT: A specific real example, outside of USA.
+    SHELL:  # See "Note 1".
+        entity_type: stock
+        country: luteraa
+        # SEE CAREFULLY: Ticker has ".L" suffix, same as Yahoo. Stocks outside
+        # USA typically have suffixes for denoting different stock exchange.
+        # For Shell, see: https://finance.yahoo.com/quote/SHEL.L/profile/
+        ticker: SHEL.L
+        name: Shell plc
+        company_name: Shell plc
+        company_address_without_zipcode: |-
+            Shell Centre
+            London
+        company_address_zipcode: "SE1 7NA"
+
+    VOO:
+        entity_type: etf
+        country: USA
+        ticker: VOO
+        name: Vanguard S&P 500 ETF
+        # For funds, name != company_name, since the fund name/entity is
+        # different from the company managing the fund.
+        company_name: The Vanguard Group, Inc.
+        company_address_without_zipcode: |-
+            100 Vanguard Boulevard
+            Malvern, PA
+        company_address_zipcode: "19355"
+
+
+    FDRXX:
+        entity_type: cash_parking_mmf
+        country: USA
+        ticker: FDRXX  # See "Note 6".
+        name: Fidelity Government Cash Reserves
+        company_name: Fidelity Investments
+        company_address_without_zipcode: |-
+            245 Summer Street
+            Boston, MA
+        company_address_zipcode: "02210"
+
+    FYIXX:
+        entity_type: cash_parking_mmf
+        country: USA
+        ticker: FYIXX  # See "Note 6".
+        name: Fidelity Treasury Only Money Market Fund - Class OUS
+        company_name: Fidelity Investments
+        company_address_without_zipcode: |-
+            245 Summer Street
+            Boston, MA
+        company_address_zipcode: "02210"
+
+    robinhood_wallet:  # Just making up stuff.
+        entity_type: cash_wallet
+        country: USA
+        ticker: null   # Must be null.
+        name: null     # Must be null.
+        company_name: Robinhood Financial LLC
+        company_address_without_zipcode: |-
+            500 Colonial Center Parkway
+            Suite 100
+            Lake Mary, FL
+        company_address_zipcode: "32746"
+
+    # and so on...
+
+
+###############################################################################
+
+
+brokers:
+    fidelity_rsu:  # See "Note 1".
+        country: USA  # Use the country key.
+        name: Fidelity Stock Plan Services LLC
+        address_without_zipcode: |-
+            245 Summer Street
+            Boston, MA
+        address_zipcode: "02210"
+        account_number: I01-234567
+        account_opening_date: 2020-01-30  # YYYY-MM-DD
+
+        # The following three correspond to the "Status" column in table A2.
+        # It is okay to specify any one of them, the others will default to
+        # false. One and only one needs to be true.
+        i_am_legal_owner: False
+        i_am_beneficial_owner: True
+        i_am_beneficiary: False
+
+
+    robinhood_personal:  # See "Note 1".
+        country: USA
+        name: Robinhood Financial LLC
+        address_without_zipcode: |-
+            500 Colonial Center Parkway
+            Suite 100
+            Lake Mary, FL
+        address_zipcode: "32746"
+        account_number: s0m3th1ng
+        account_opening_date: 2023-01-30  # YYYY-MM-DD
+        i_am_legal_owner: True  # Only one bool specified. Dummy example.
+
+
+    # and so on...
+
+
+###############################################################################
+
+
+# Do not modify these; These are just for your info.
+
+valid_activity_types:
+    - vest              # It's free, no cash is involved, you just get stocks.
+    - buy               # Cash is used up for buying.
+    - stock_dividend    # When we get dividends from stocks. Increases cash.
+    - cash_dividend     # When we get dividends from cash. Increases cash.
+    - sell_fifo         # FIFO selling. 99% of time this is what you want.
+    - sell_specific     # Specific unit/lot selling. Avoid if you don't know.
+    - cash_opening      # Sets opening balance and the cash fund to use.
+    - cash_fund_switch  # To change cash fund used and transfer existing money.
+    - bank_to_cash      # Add funds from bank account to broker account.
+    - cash_to_bank      # Withdraw cash from broker account to bank account.
+
+
+valid_activity_types_in_opening_ledger:
+    - cash_opening
+    - vest
+    - buy
+
+
+invalid_activity_types_in_normal_ledger:
+    - cash_opening
+
+
+activity_types_which_have_tax_withholding:
+    - sell_fifo
+    - sell_specific
+    - stock_dividend
+    - cash_dividend
+
+
+###############################################################################
+
+
+# If you are filing tax for Apr 2024 to Mar 2025, this is from Jan 1 2024.
+# Note the leading dash. It's to enforce a list of dict for order enforcement.
+# Well the order doesn't really matter for this one.
+opening_ledger_on_12_AM_jan_1_prev_fy:
+    - fidelity_cash_init:  # See "Note 1".
+        activity_type: cash_opening
+        broker: fidelity_rsu
+        entity: FDRXX
+        amount: 123.45
+
+    - robinhood_cash_init:  # See "Note 1".
+        activity_type: cash_opening
+        broker: robinhood_personal
+        entity: robinhood_wallet
+        amount: 2000
+
+    # If you have another broker, you must init it's cash too, even if it is
+    # zero. And only one cash_opening per broker is allowed.
+
+    - STOCK_vest_prev_1:  # See "Note 1".
+        activity_type: vest
+        broker: fidelity_rsu
+        entity: STOCK
+        remaining_units: 30
+        initial_acquisition:
+            date: 2022-05-15
+            stock_price_merchant_fmv: 133.7  # FMV used by merchant banker.
+            merchant_ttbr: 75.57             # TTBR used by merchant banker.
+
+    - STOCK_vest_prev_2:  # See "Note 1".
+        activity_type: vest
+        broker: fidelity_rsu
+        entity: STOCK
+        remaining_units: 50
+        initial_acquisition:
+            date: 2023-12-31
+            stock_price_merchant_fmv: 100.4  # Same as above.
+            merchant_ttbr: 80.08             # Same as above.
+
+    - RANDOM_prev_buy:  # See "Note 1".
+        activity_type: buy
+        broker: robinhood_personal
+        entity: RANDOM
+        remaining_units: 28
+        initial_acquisition:
+            date: 2023-06-02
+            stock_price_in_broker_doc: 12.34  # Normal buy => Shown price.
+
+    # and so on... (use same as RANDOM_prev_buy for ETFs/MFs)
+
+
+###############################################################################
+
+
+# If filing tax for FY2024-2025 (Apr 2024 to Mar 2025), you have to specify the
+# activities from 1 Jan 2024 (not 1 Apr) to 31 Mar 2025. We did open ledger at
+# 1st Jan. We need to do since 1 Jan to calculate for schedule FA which uses
+# calendar year, even if tax has been paid for previous FY.
+#
+# NOTE: ORDER IS IMPORTANT FOR THIS ONE. Hence leading "-" to enforce list.
+activity_from_jan_1_prev_fy_to_31_mar_current_fy:
+    - robinhood_add_cash_1:  # See "Note 1".
+        activity_type: bank_to_cash
+        broker: robinhood_personal
+        date: 2024-01-15
+        amount: 500
+
+    - RANDOM_buy_1:  # See "Note 1".
+        activity_type: buy
+        broker: robinhood_personal
+        date: 2024-02-28
+        entity: RANDOM
+        units: 10
+        stock_price_in_broker_doc: 20.01  # Normal buy => Shown price.
+
+    - STOCK_sell_1:
+        activity_type: sell_fifo
+        broker: fidelity_rsu
+        date: 2024-02-28
+        entity: STOCK
+        units: 20
+        stock_price_in_broker_doc: 147.36  # Sell will always have shown price.
+        tax_withholding:  # Must specify withholding, even if 0. See "Note 9".
+            rate_percent: 0
+            amount: 0
+        misc_fees: 0  # Must specify any other fees charged, even if 0.
+
+    ##################### FY taxable activity starts now! #####################
+
+    - STOCK_vest_new:  # See "Note 1".
+        activity_type: vest
+        broker: fidelity_rsu
+        date: 2024-05-15
+        entity: STOCK
+        units: 50
+        stock_price_merchant_fmv: 180.84  # FMV used by merchant banker.
+        merchant_ttbr: 82.10              # TTBR used by merchant banker.
+
+    # In this example, earliest units are from earlier stock vests, whereas
+    # sell-to-cover after vesting sells from the newly vested lot and not
+    # the old ones. So we must use sell_specific activity_type.
+    - STOCK_vest_new_sell_to_cover:
+        activity_type: sell_specific  # Sell to cover sells from vested lot.
+        broker: fidelity_rsu
+        date: 2024-05-16
+        entity: STOCK
+        unit_lot_key: STOCK_vest_new
+        units: 5
+        stock_price_in_broker_doc: 181.12
+        tax_withholding:
+            rate_percent: 0
+            amount: 0
+        misc_fees: 0
+        # Must specify the following optional key for sell to cover.
+        amount_deducted_on_sell_to_cover: 60.12
+
+    - STOCK_dividend_1_fidelity:
+        activity_type: stock_dividend
+        broker: fidelity_rsu
+        date: 2024-06-15
+        entity: STOCK
+        amount: 12.24
+        tax_withholding:  # Must specify tax withholding. See "Note 9".
+            rate_percent: 25
+            amount: 3.06
+        misc_fees: 0  # Must specify any other fees charged, even if 0.
+
+    - CASH_dividend_fidelity_1:  # Dividend from FDRXX, stored in FDRXX.
+        activity_type: cash_dividend
+        broker: fidelity_rsu
+        date: 2024-08-31
+        amount: 20.8
+        tax_withholding:
+            rate_percent: 0
+            amount: 0
+        misc_fees: 0.01  # See the "Note -1" at the end below.
+
+    - STOCK_dividend_reinvest:
+        activity_type: buy  # Reinvestment is a normal buy.
+        broker: fidelity_rsu
+        date: 2024-12-01
+        entity: STOCK
+        units: 0.12  # Fractional buy.
+        stock_price_in_broker_doc: 173.21  # Normal buy, not a vest.
+
+    - ghar_vaapasi:
+        activity_type: cash_to_bank
+        broker: fidelity_rsu
+        date: 2024-09-05
+        amount: 1234.5
+
+    - STOCK_buy_personal:
+        activity_type: buy
+        broker: robinhood_personal
+        date: 2024-10-01
+        entity: STOCK
+        units: 10
+        stock_price_in_broker_doc: 175.3  # Normal buy, not a vest.
+
+    - STOCK_dividend_robinhood:
+        activity_type: stock_dividend
+        broker: robinhood_personal
+        date: 2024-11-15
+        entity: STOCK
+        amount: 9.87
+        tax_withholding:
+            rate_percent: 25
+            amount: 2.47
+        misc_fees: 0
+
+    - CASH_dividend_robinhood_1:
+        activity_type: cash_dividend
+        broker: robinhood_personal
+        date: 2024-08-31
+        amount: 0.78
+        tax_withholding:
+            rate_percent: 0
+            amount: 0
+        misc_fees: 0
+
+    - RANDOM_sell_specific:
+        activity_type: sell_specific
+        broker: robinhood_personal
+        date: 2025-01-10
+        entity: RANDOM
+        units: 10
+        stock_price_in_broker_doc: 22.88
+        # Specify the specific lot from which shares are sold.
+        # In our example, earliest units are from RANDOM_prev_buy, and then
+        # from RANDOM_buy_1. In FIFO selling, units from former would be sold.
+        # If sold units from latter, we use this activity_type and specify it.
+        unit_lot_key: RANDOM_buy_1
+        tax_withholding:
+            rate_percent: 0
+            amount: 0
+        misc_fees: 0
+        # We don't really need to specify the following key, 0 is default.
+        amount_deducted_on_sell_to_cover: 0
+
+    - FDRXX_to_FYIXX:  # See the "Note -1" at the end below.
+        activity_type: cash_fund_switch
+        broker: fidelity_rsu
+        date: 2025-03-01
+        new_entity: FYIXX
+        misc_fees: 0.01  # See the "Note -1" at the end below.
+
+    - CASH_dividend_fidelity_2:  # Dividend from FYIXX, stored in FYIXX.
+        activity_type: cash_dividend
+        broker: fidelity_rsu
+        date: 2025-03-30
+        amount: 0.46
+        tax_withholding:
+            rate_percent: 0
+            amount: 0
+        misc_fees: 0
+
+###############################################################################
+
+
+# Note -1:
+#
+# Case study: Fidelity gave dividend on FDRXX. The fund is not taxable but
+# they were required to do withholding for some reason (IIUC that is why
+# they switched to FYIXX). So the transaction summary has entries like the
+# following under non-resident tax withholding section (let's take an example
+# value = 0.69, so tax = 0.25 * 0.69 ≈ 0.17):
+#   -$0.01
+#    $0.17
+#   -$0.17
+#
+# So the 0.17 tax is offsetted and tax should be 0.
+#
+# The -$0.01 seems to happen everytime the FDRXX fund was touched (it happened
+# when moving to FYIXX too), and it does not show up on 1042-S by the US IRS.
+# So it's not worth the hassle for measly tax credits.
+
+
+###############################################################################
+
+
+# End of file.
