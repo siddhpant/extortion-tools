@@ -4046,6 +4046,7 @@ def create_schedule_fsi_and_form_67(avg_tax_rate: Fraction) -> None:
     ) -> None:
         int_tax_in_india = int(income_value * avg_tax_rate)
         int_tax_withheld = int(tax_withheld)
+        int_credit_claimed = min(int_tax_in_india, int_tax_withheld)
 
         income_type_mapping = {
             "ltcg": "Long term capital gain",
@@ -4055,6 +4056,11 @@ def create_schedule_fsi_and_form_67(avg_tax_rate: Fraction) -> None:
 
         def country_attr(attr: str) -> Any:
             return getattr(country, f"{attr}_{income_type_key}")
+
+        # We do not support tax rate different from DTAA rate as of now.
+        tax_rate_pc_outside_india = format(
+            country_attr("dtaa_tax_rate_percent"), ".2f"
+        )
 
         form67_csv_rows.append({
             "Sl. No.": len(form67_csv_rows) + 1,
@@ -4068,25 +4074,20 @@ def create_schedule_fsi_and_form_67(avg_tax_rate: Fraction) -> None:
 
             "Income from outside India": int(income_value),
             "Amount": int_tax_withheld,
+            "Rate(%)": tax_rate_pc_outside_india,
 
-            "Rate(%)": avg_tax_rate_percent_str,
             "Tax payable on such income under normal provisions in India":
                 int_tax_in_india,
-
             "Tax payable on such income under Section 115JB/JC": 0,
 
             "Article No. of Double Taxation Avoidance Agreements":
                 country_attr("dtaa_article"),
-
             "Rate of tax as per Double Taxation Avoidance Agreements(%)":
-                format(country_attr("dtaa_tax_rate_percent"), ".2f"),
+                tax_rate_pc_outside_india,
 
-            # NOTE: We do NOT support tax withheld at rates other than the DTAA
-            #       rate.
-            "Amount": int_tax_withheld,
-
+            "Amount": int_credit_claimed,
             "Credit claimed under section 91": 0,
-            "Total foreign tax credit claimed": int_tax_withheld,
+            "Total foreign tax credit claimed": int_credit_claimed,
         })
 
     for country_id, data in get_earnings_per_country().items():
