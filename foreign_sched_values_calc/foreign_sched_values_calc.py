@@ -292,6 +292,13 @@ class Country(_BasePostInit):
 
         ensure_unique_yaml_key(self.country_id)
 
+        if not self.name:
+            raise ValueError("Empty name provided for country with ID "
+                             f"{self.country_id}.")
+        else:
+            # Normalise format to store.
+            self.name = self.name.title()
+
         if self.currency not in ttbr_dict:
             raise ValueError(f"Unknown currency {self.currency} mentioned for "
                              f"country {self.country_id}.")
@@ -3919,6 +3926,7 @@ def create_capital_gain_and_dividends_and_get_average_tax_rate() -> Fraction:
         input("Enter tax payable after rebate (Part B - TTI): ")
         .replace(",", "")
     )
+    print("\n\n")
 
     avg_tax_rate = total_tax / total_income
     return avg_tax_rate
@@ -4062,15 +4070,21 @@ def create_schedule_fsi_and_form_67(avg_tax_rate: Fraction) -> None:
             country_attr("dtaa_tax_rate_percent"), ".2f"
         )
 
+        # Since column names are same, the stupid engineer chose a trailing
+        # space as the charcter to uniqify the column name.
+        space = " "
+
         form67_csv_rows.append({
             "Sl. No.": len(form67_csv_rows) + 1,
 
-            # "Name" is misleading. Poor engineering by Infosys contractor.
-            "Name of the country/specified territory": country.code,
+            # Docs say code can be used, but the docs and website is broken,
+            # no matter you use name or code. Poor engineering by the Infosys
+            # contractor.
+            "Name of the country/specified territory": country.name,
             "Please specify": None,
 
             "Source of income": income_type_mapping[income_type_key],
-            "Please specify": None,
+            f"Please specify{space}": None,
 
             "Income from outside India": int(income_value),
             "Amount": int_tax_withheld,
@@ -4085,7 +4099,7 @@ def create_schedule_fsi_and_form_67(avg_tax_rate: Fraction) -> None:
             "Rate of tax as per Double Taxation Avoidance Agreements(%)":
                 tax_rate_pc_outside_india,
 
-            "Amount": int_credit_claimed,
+            f"Amount{space}": int_credit_claimed,
             "Credit claimed under section 91": 0,
             "Total foreign tax credit claimed": int_credit_claimed,
         })
@@ -4133,16 +4147,6 @@ def create_schedule_fsi_and_form_67(avg_tax_rate: Fraction) -> None:
             add_to_fsi(*args)
             add_to_form67(*args)
 
-    form67_csv_path = output_dir / "form_67.csv"
-
-    with open(form67_csv_path, "w") as f:
-        writer = csv.DictWriter(f, fieldnames=list(form67_csv_rows[0].keys()))
-        writer.writeheader()
-        writer.writerows(form67_csv_rows)
-
-    form67_rel_path = form67_csv_path.relative_to(Path(__file__).parent)
-    print(f"Form 67 stored in {form67_rel_path}")
-
     fsi_csv_path = output_dir / "schedule_fsi.csv"
 
     with open(fsi_csv_path, "w") as f:
@@ -4153,6 +4157,25 @@ def create_schedule_fsi_and_form_67(avg_tax_rate: Fraction) -> None:
     fsi_rel_path = fsi_csv_path.relative_to(Path(__file__).parent)
     print("Schedule FSI partially filled for reference stored in "
           f"{fsi_rel_path}")
+
+    form67_csv_path = output_dir / "form_67.csv"
+
+    with open(form67_csv_path, "w") as f:
+        writer = csv.DictWriter(f, fieldnames=list(form67_csv_rows[0].keys()))
+        writer.writeheader()
+        writer.writerows(form67_csv_rows)
+
+    form67_rel_path = form67_csv_path.relative_to(Path(__file__).parent)
+    print()
+    print(cleandoc(f"""
+        Form 67 stored in {form67_rel_path}
+
+        Note: After uploading form 67 CSV, you'll see error - open the CSV and
+        manually fill the values. It's an issue with the website - if you
+        export after filling on the website and upload the same file directly,
+        you'll see the same error. The stupid Infosys guy who made the broken
+        CSV parser on ITD website didn't even bother to QA it.
+    """))
 
 
 ###############################################################################
