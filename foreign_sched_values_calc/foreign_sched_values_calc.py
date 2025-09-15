@@ -1969,7 +1969,7 @@ class ShareLot(MapToEntity, DatewiseLog):
 
     @property
     def total_gain_inr_in_financial_year_for_tax(self) -> Fraction:
-        return self.sellings.capital_gain_tax_inr_between_dates(
+        return self.sellings.gain_amount_inr_for_tax_between_dates(
             fy_start(), fy_end()
         )
 
