@@ -832,7 +832,11 @@ class _TaxWithholdingAndFees(_BasePostInit):
             raise ValueError("tax_withholding_amount < 0.")
 
         if self.gross_total_value_native < self.tax_withholding_amount_native:
-            raise ValueError("total_amount < tax_withholding_amount.")
+            raise ValueError(
+                f"total_amount ({self.gross_total_value_native}) "
+                "< tax_withholding_amount "
+                f"({self.tax_withholding_amount_native})"
+            )
 
         if (
             self.tax_withholding_rate == 0
@@ -2663,7 +2667,7 @@ class Broker(MapToCountry, DatewiseLog):
         cost_per_unit: Fraction,
         misc_fees: Fraction,
         tax_withholding_dict: dict[str, Fraction],
-        amount_deducted_on_sell_to_cover: Fraction,
+        india_tax_deducted_on_sell_to_cover: Fraction,
     ) -> None:
         self._ensure_wallet_init()
 
@@ -2707,11 +2711,20 @@ class Broker(MapToCountry, DatewiseLog):
         net_amount = sell_txn.net_total_value_native
         cash_txn_id = txn_id + "//GET_CASH_AFTER_SELL"
 
-        if amount_deducted_on_sell_to_cover != ZERO:
-            net_amount -= amount_deducted_on_sell_to_cover
+        if india_tax_deducted_on_sell_to_cover != ZERO:
+            net_amount -= india_tax_deducted_on_sell_to_cover
 
-        self.add_cash(txn_id=cash_txn_id, date=date, amount=net_amount,
-                      misc_fees=0)
+        if net_amount < 0:
+            raise ValueError(
+                f"For {txn_id}, Sell net value (sale proceed - (fees + tax "
+                "withheld) < india_tax_deducted_on_sell_to_cover : "
+                f"{sell_txn.net_total_value_native} < "
+                f"{india_tax_deducted_on_sell_to_cover}"
+            )
+
+        if net_amount > 0:
+            self.add_cash(txn_id=cash_txn_id, date=date, amount=net_amount,
+                          misc_fees=0)
 
     def receive_stock_dividend(
         self,
@@ -3605,7 +3618,7 @@ def parse_main_activities() -> None:
 
             case "sell_specific":
                 stc_deduct = activity_dict.get(
-                    "amount_deducted_on_sell_to_cover", ZERO
+                    "india_tax_deducted_on_sell_to_cover", ZERO
                 )
 
                 broker.sell_shares_specific(
@@ -3617,7 +3630,7 @@ def parse_main_activities() -> None:
                     cost_per_unit=activity_dict["stock_price_in_broker_doc"],
                     misc_fees=activity_dict["misc_fees"],
                     tax_withholding_dict=activity_dict["tax_withholding"],
-                    amount_deducted_on_sell_to_cover=stc_deduct,
+                    india_tax_deducted_on_sell_to_cover=stc_deduct,
                 )
 
             case "cash_fund_switch":

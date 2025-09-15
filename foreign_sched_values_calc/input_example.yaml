@@ -441,7 +441,7 @@ activity_from_jan_1_prev_fy_to_31_mar_current_fy:
             amount: 0
         misc_fees: 0
         # Must specify the following optional key for sell to cover.
-        amount_deducted_on_sell_to_cover: 60.12
+        india_tax_deducted_on_sell_to_cover: 60.12
 
     - STOCK_dividend_1_fidelity:
         activity_type: stock_dividend
@@ -524,7 +524,7 @@ activity_from_jan_1_prev_fy_to_31_mar_current_fy:
             amount: 0
         misc_fees: 0
         # We don't really need to specify the following key, 0 is default.
-        amount_deducted_on_sell_to_cover: 0
+        india_tax_deducted_on_sell_to_cover: 0
 
     - FDRXX_to_FYIXX:  # See the "Note -1" at the end below.
         activity_type: cash_fund_switch
