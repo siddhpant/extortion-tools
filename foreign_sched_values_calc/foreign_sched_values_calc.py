@@ -61,6 +61,10 @@ fx_rate_repo_dir = file_dir / "sbi-fx-ratekeeper"
 fx_rate_repo_link = "https://github.com/sahilgupta/sbi-fx-ratekeeper.git"
 ttbr_dict = {}
 
+
+##############################################################################
+
+
 # Use Fraction for avoiding precision errors due to float.
 yaml.add_constructor(
     "tag:yaml.org,2002:float",
@@ -75,6 +79,38 @@ yaml.add_constructor(
     Loader=yaml.SafeLoader
 )
 
+
+def fraction_representer(dumper, data):
+    """When dumping, we must convert Fractions back to int/float."""
+    if data.denominator == 1:
+        return dumper.represent_int(int(data))
+    else:
+        return dumper.represent_float(float(data))
+
+
+def str_representer(dumper, data):
+    """
+    Make multiline-string dumping better. Courtesy:
+    https://github.com/yaml/pyyaml/issues/240#issuecomment-3243119188
+    """
+    str_tag = "tag:yaml.org,2002:str"
+
+    if data.count("\n") == 0:
+        return dumper.represent_scalar(str_tag, data)
+
+    data = "\n".join(line.rstrip().replace("\t", " " * 8)
+                     for line in data.splitlines())
+
+    return dumper.represent_scalar(str_tag, data, style="|")
+
+
+yaml.add_representer(Fraction, fraction_representer, Dumper=yaml.SafeDumper)
+yaml.add_representer(str, str_representer, Dumper=yaml.SafeDumper)
+
+
+##############################################################################
+
+
 ZERO = Fraction(0)
 
 PARSING_OPENING_LEDGER = False
@@ -88,6 +124,17 @@ def fetch_input() -> None:
 
     with open(input_yaml_path) as f:
         input_dict = yaml.safe_load(f)
+
+    if "AUTODRAFTED" in input_dict:
+        raise ValueError(cleandoc("""
+            The input file has been auto-drafted.
+
+            Please verify the pre-filled data for correctness (did DTAA article
+            change next year? Did the company shift its headquarters?), and
+            fill up the missing data, and then remove the "AUTODRAFTED" key.
+
+            Always remember to be careful about taxation matters.
+        """))
 
     for key, value in input_dict["metadata"].items():
         metadata_dict[key] = value
@@ -164,6 +211,15 @@ def fy_end() -> Date:
 
 def next_fy_start() -> Date:
     return fy_end() + timedelta(days=1)
+
+
+def next_fy_end() -> Date:
+    current_fy_end = fy_end()
+    return Date(
+        current_fy_end.year + 1,
+        current_fy_end.month,
+        current_fy_end.day,
+    )
 
 
 def date_in_cy(date: Date) -> bool:
@@ -941,6 +997,10 @@ class _BuyTransaction(_ShareTransaction):
         return True
 
     @property
+    def vest(self) -> bool:
+        raise NotImplementedError
+
+    @property
     def gross_total_value_native_non_tax(self) -> Fraction:
         raise NotImplementedError
 
@@ -963,6 +1023,10 @@ class _BuyTransaction(_ShareTransaction):
 
 @dataclass(kw_only=True)
 class ManualBuyTransaction(_BuyTransaction):
+    @property
+    def vest(self) -> bool:
+        return False
+
     @property
     def net_total_value_native(self) -> Fraction:
         return self.gross_total_value_native
@@ -1019,6 +1083,10 @@ class VestingTransaction(_BuyTransaction):
         if self.cost_per_unit_in_broker_doc <= 0:
             raise ValueError("cost_per_unit_in_broker_doc <= 0 for "
                              f"transaction '{self.txn_id}'.")
+
+    @property
+    def vest(self) -> bool:
+        return True
 
     @property
     def net_total_value_native(self) -> Fraction:
@@ -2887,11 +2955,19 @@ class Broker(MapToCountry, DatewiseLog):
         Get all possible cash balances in account as on a date, as transactions
         can cause a split.
 
-        See CashWallet.get_balances_on() for return value.
+        See CashWallet.get_balances_on() for the dict part of return value.
+
+        The opening and closing values of each wallet will have the wallet ID
+        suffixed to them ("__opening_<wallet_id>" and "__closing_<wallet_id>")
+        so that one can differentiate if a switch happened in between.
+
+        So there can potentially be multiple __opening_ and __closing_ keys.
+        Take care to not double count.
         """
         self._ensure_wallet_init()
-        applicable_wallet = None
+        wallet_balances = OrderedDict()
 
+        # We depend on _all_wallets being ordered.
         for wallet in self._all_wallets:
             if wallet.open_date > date:
                 continue
@@ -2899,18 +2975,28 @@ class Broker(MapToCountry, DatewiseLog):
             if wallet.closed and date > wallet.close_date:
                 continue
 
-            if applicable_wallet is not None:
-                raise RuntimeError(
-                    f"Found two applicable wallets for same date {date}: "
-                    f"{applicable_wallet.entity_id}, {wallet.entity_id}"
-                )
+            balances = wallet.get_balances_on(date)
 
-            applicable_wallet = wallet
+            for last in (False, True):
+                key, value = balances.popitem(last=last)
 
-        if applicable_wallet is None:
-            raise ValueError(f"Cannot find applicable wallet for date {date}.")
+                if (
+                    (not last and key == "__opening")
+                    or (last and key == "__closing")
+                ):
+                    key += "_" + wallet.entity_id
 
-        return applicable_wallet.get_balances_on(date)
+                balances[key] = value
+                balances.move_to_end(key, last=last)
+
+            wallet_balances |= balances
+
+        if not wallet_balances:
+            raise ValueError(
+                f"Cannot find any applicable wallet for date {date}."
+            )
+
+        return wallet_balances
 
     def get_specific_entity_total_holding_values_on(
         self,
@@ -3125,12 +3211,22 @@ class Broker(MapToCountry, DatewiseLog):
         stock_values = self.get_total_stock_holding_values_on(date,
                                                               for_taxation)
 
+        first_key, cash_balances_opening = next(iter(cash_balances.items()))
+        if not first_key.startswith("__opening_"):
+            raise RuntimeError("Cash balances first key is not __opening but "
+                               f"'{first_key}' for broker {self.broker_id}.")
+
+        last_key, cash_balances_closing = next(reversed(cash_balances.items()))
+        if not last_key.startswith("__closing_"):
+            raise RuntimeError("Cash balances last key is not __closing but "
+                               f"'{last_key}' for broker {self.broker_id}.")
+
         total_portfolio_values = OrderedDict()
         total_portfolio_values["__opening"] = (
-            cash_balances["__opening"] + stock_values["__opening"]
+            cash_balances_opening + stock_values["__opening"]
         )
         total_portfolio_values["__closing"] = (
-            cash_balances["__closing"] + stock_values["__closing"]
+            cash_balances_closing + stock_values["__closing"]
         )
 
         # If no transaction happened for ANY cash or stock on this date, then
@@ -3143,7 +3239,7 @@ class Broker(MapToCountry, DatewiseLog):
             ]
         ):
             total_portfolio_values["__highest_intraday"] = (
-                cash_balances["__opening"] + stock_values["__highest_intraday"]
+                cash_balances_opening + stock_values["__highest_intraday"]
             )
             total_portfolio_values.move_to_end("__closing")
             return total_portfolio_values
@@ -3157,7 +3253,7 @@ class Broker(MapToCountry, DatewiseLog):
         # might be high or low for that specific entity, but it is something,
         # and if high adding it can result in the peak value we can know of.
 
-        cash_val = cash_balances["__opening"]
+        cash_val = cash_balances_opening
         stock_val = stock_values["__opening"]
 
         for txn_id, txn in self.get_all_txns_on(date).items():
@@ -3685,6 +3781,198 @@ def parse_main_activities() -> None:
         "activity_from_apr_1_current_fy_to_31_mar_current_fy",
     ):
         _parse_main_activities(activity_key)
+
+
+###############################################################################
+
+
+def create_prefilled_yaml_for_next_year() -> None:
+    """
+    Since we have information already for this year, we can prefill this year's
+    entries for the next year's YAML.
+    """
+    next_year_yaml = {}
+
+    next_year_yaml["AUTODRAFTED"] = cleandoc("""
+        THIS FILE HAS BEEN PRE-FILLED FROM PREVIOUS YEAR'S DATA / YAML.
+
+        PLEASE VERIFY THE CORRECTNESS OF EXISTING DATA (which is not just the
+        stock values, it can be that company changed it's HQ, the DTAA article
+        changed, etc.) AND FILL UP NEW DATA APPRORPIATELY.
+
+        PLEASE CHECK input_example.yaml FOR REFERENCE.
+
+        Always remember to be careful about taxation matters. After you are
+        done, remove this key / section.
+    """)
+
+    next_year_yaml |= deepcopy(input_dict)
+
+    # Change "current" FY to next year.
+    next_year_yaml["metadata"] = {
+        "current_financial_year_start": next_fy_start(),
+        "current_financial_year_end": next_fy_end(),
+        "slab_rate_percent_for_stcg": "TODO / FILL THIS APPROPRIATELY",
+    }
+
+    # Empty "current FY" entries for the user to fill.
+    next_year_yaml["activity_from_apr_1_current_fy_to_31_mar_current_fy"] = [
+        "TODO / FILL THIS SECTION"
+    ]
+
+    start_date = next_cy_start()
+
+    # Let's fill up the opening ledger.
+
+    opening_ledger = []
+
+    for broker in brokers.values():
+        broker_id = broker.broker_id
+
+        first_key, init_bal = (
+            broker.get_cash_balances_on(start_date).popitem(last=False)
+        )
+
+        if not first_key.startswith("__opening_"):
+            raise RuntimeError(f"Invalid opening balance key '{first_key}' "
+                               f"on {start_date} for broker {broker_id}.")
+
+        wallet_entity_id = first_key.removeprefix("__opening_")
+        if wallet_entity_id not in entities:
+            raise RuntimeError(
+                f"Non-existent entity '{wallet_entity_id}' extracted from "
+                f"opening balance key '{first_key}' on {start_date} for "
+                f"broker {broker_id}."
+            )
+
+        opening_ledger.append({
+            f"{broker_id}_cash_init": {
+                "activity_type": "cash_opening",
+                "broker": broker_id,
+                "entity": wallet_entity_id,
+                "amount": init_bal,
+            }
+        })
+
+        for stock_entity_id, lot_map in broker._lots.items():
+            for buy_txn_id, lot in lot_map.items():
+                buy_txn = lot.buy_txn_obj
+
+                if buy_txn.entity_id != stock_entity_id:
+                    raise RuntimeError(
+                        f"In broker {broker_id} lot map, buy_txn {buy_txn_id} "
+                        f"is of entity {buy_txn.entity_id}, but expected for "
+                        f"entity {stock_entity_id}."
+                    )
+
+                if buy_txn.date >= start_date:
+                    # The lot must exist prior to the start_date to be in the
+                    # opening ledger of start_date.
+                    continue
+
+                entry_dict = {
+                    "activity_type": "vest" if buy_txn.vest else "buy",
+                    "broker": broker_id,
+                    "entity": buy_txn.entity_id,
+                    "remaining_units": lot.opening_units_on(start_date),
+                    "initial_acquisition": {
+                        "date": buy_txn.date,
+                        "stock_price_in_broker_doc":
+                            buy_txn.cost_per_unit_in_broker_doc,
+                    }
+                }
+
+                if buy_txn.vest:
+                    entry_dict["initial_acquisition"] |= {
+                        "stock_price_merchant_fmv": buy_txn.cost_per_unit,
+                        "merchant_ttbr": buy_txn.merchant_ttbr,
+                    }
+
+                opening_ledger.append({buy_txn_id: entry_dict})
+            # End of stock lot for-loop.
+        # End of stock for-loop.
+
+    next_year_yaml["opening_ledger_on_12_AM_jan_1_prev_fy"] = opening_ledger
+
+    # Let's fill up the activities in next CY before the next FY start. We can
+    # just copy what the user gave, no need to determine the values ourselves.
+
+    input_txn_id_to_entry_dict = dict(
+        tuple(entry_dict.items())[0]  # (key, value)
+        for entry_dict in input_dict[
+            "activity_from_apr_1_current_fy_to_31_mar_current_fy"
+        ]
+    )
+
+    jan1_to_mar31_entries = []
+    end_date = next_fy_start() - timedelta(days=1)
+
+    for txn_id, txn in all_transactions.items():
+        if not (start_date <= txn.date <= end_date):
+            continue
+
+        cleaned_txn_id = txn_id.split("//")[0]
+        jan1_to_mar31_entries.append({
+            cleaned_txn_id: input_txn_id_to_entry_dict[cleaned_txn_id]
+        })
+
+    next_year_yaml["activity_from_jan_1_prev_fy_to_31_mar_prev_fy"] = (
+        jan1_to_mar31_entries
+    )
+
+    yaml_content = yaml.safe_dump(next_year_yaml, sort_keys=False, indent=4,
+                                  default_flow_style=False)
+
+    yaml_path = output_dir / "next_year_input_prefilled.yaml"
+    with open(yaml_path, "w") as f:
+        top_level_key = ""
+        for line in yaml_content.splitlines():
+            if not line:
+                f.write("\n")
+                continue
+
+            if line[0] not in (" ", "-"):  # No indent => top level key.
+                if top_level_key:
+                    f.write("\n\n" + ("#" * 79) + "\n\n\n")
+                top_level_key = line
+            else:
+                if line.strip().startswith("-"):
+                    # We should indent the list start.
+                    spaces = ""
+                    first_char = None
+
+                    for i in line:
+                        if i == " ":
+                            spaces += i
+                        elif i == "-":
+                            continue
+                        else:
+                            first_char = i
+                            break
+
+                    if len(spaces) < 4:
+                        spaces = " " * 4
+
+                    line = (spaces + "- " + first_char
+                            + line.split(first_char, 1)[1])
+
+                if (
+                    # 2nd level key.
+                    line.startswith(" " * 4)
+                    and line[4] != " "
+                    and (
+                        line.endswith(":")
+                        or ": &" in line
+                        or ": *" in line
+                    )
+                ):
+                    f.write("\n")
+
+            f.write(line)
+            f.write("\n")
+
+    rel_path = yaml_path.relative_to(Path(__file__).parent)
+    print(f"Pre-filled input file for next year stored in {rel_path}")
 
 
 ###############################################################################
@@ -4275,6 +4563,9 @@ def main() -> int:
     parse_input()
 
     print("\n" + "-" * 79 + "\n")
+
+    create_prefilled_yaml_for_next_year()
+    print()
 
     create_schedule_fa_table_a2()
     create_schedule_fa_table_a3()
