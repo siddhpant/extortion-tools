@@ -951,8 +951,18 @@ class _BuyTransaction(_ShareTransaction):
         return True
 
     @property
-    def total_buy_value_inr_for_initial_acquire(self) -> Fraction:
+    def gross_total_value_native_non_tax(self) -> Fraction:
         raise NotImplementedError
+
+    @property
+    def total_buy_value_inr_for_initial_acquire_non_tax(self) -> Fraction:
+        """
+        Yes, we don't use merchant's TTBR.
+        Read the docstring for VestingTransaction.
+        """
+        attr = "gross_total_value_native_non_tax"
+        _, value = self._total_value_ttbr_and_inr_same_day(attr)
+        return value
 
     @property
     def total_buy_value_inr_for_tax(self) -> Fraction:
@@ -968,8 +978,12 @@ class ManualBuyTransaction(_BuyTransaction):
         return self.gross_total_value_native
 
     @property
-    def total_buy_value_inr_for_initial_acquire(self) -> Fraction:
-        return self.gross_total_value_inr_same_day
+    def gross_total_value_native_non_tax(self) -> Fraction:
+        return self.gross_total_value_native
+
+    @property
+    def cost_per_unit_in_broker_doc(self) -> Fraction:
+        return self.cost_per_unit
 
 
 @dataclass(kw_only=True)
@@ -1002,7 +1016,7 @@ class VestingTransaction(_BuyTransaction):
     Remember: Taxation is disjoint from FA reporting. FA reporting probably
     needs to match the values reported to India via FATCA/CRS.
     """
-
+    cost_per_unit_in_broker_doc: Fraction
     merchant_ttbr: Fraction
 
     def __post_init__(self) -> None:
@@ -1012,18 +1026,17 @@ class VestingTransaction(_BuyTransaction):
             raise ValueError("merchant_ttbr <= 0 for transaction "
                              f"'{self.txn_id}'.")
 
-    @property
-    def gross_total_value_native(self) -> Fraction:
-        return self.units * self.cost_per_unit
+        if self.cost_per_unit_in_broker_doc <= 0:
+            raise ValueError("cost_per_unit_in_broker_doc <= 0 for "
+                             f"transaction '{self.txn_id}'.")
 
     @property
     def net_total_value_native(self) -> Fraction:
         return self.gross_total_value_native
 
     @property
-    def total_buy_value_inr_for_initial_acquire(self) -> Fraction:
-        """Yes, we don't use merchant's TTBR. Read the above paragraph."""
-        return self.gross_total_value_inr_same_day
+    def gross_total_value_native_non_tax(self) -> Fraction:
+        return self.units * self.cost_per_unit_in_broker_doc
 
     @property
     def total_value_inr_merchant_banker(self) -> Fraction:
@@ -1880,7 +1893,7 @@ class ShareLot(MapToEntity, DatewiseLog):
                     holding_values[before_key] = (ZERO, ZERO)
 
                     units = txn.units
-                    price_at_buy = txn.gross_total_value_native
+                    price_at_buy = txn.gross_total_value_native_non_tax
                     holding_values[after_key] = (units, price_at_buy)
 
                 # Only SellTransaction affects units in this lot.
@@ -2509,6 +2522,7 @@ class Broker(MapToCountry, DatewiseLog):
         units: Fraction,
         cost_per_unit: Fraction,
         merchant_ttbr_if_vest: Fraction = None,
+        broker_cost_per_unit_if_vest: Fraction = None,
         for_opening_lot: bool = False,
     ) -> None:
         self._ensure_wallet_init()
@@ -2526,8 +2540,11 @@ class Broker(MapToCountry, DatewiseLog):
                                    amount=(units * cost_per_unit))
             buy_txn = ManualBuyTransaction(**buy_txn_args)
         else:
-            buy_txn = VestingTransaction(**buy_txn_args,
-                                         merchant_ttbr=merchant_ttbr_if_vest)
+            buy_txn = VestingTransaction(
+                **buy_txn_args,
+                merchant_ttbr=merchant_ttbr_if_vest,
+                cost_per_unit_in_broker_doc=broker_cost_per_unit_if_vest,
+            )
 
         self.add_txn_to_log(buy_txn)
 
@@ -2913,6 +2930,7 @@ class Broker(MapToCountry, DatewiseLog):
         self,
         date: Date,
         entity_id: str,
+        for_taxation: bool,
     ) -> OrderedDict[str, Fraction]:
         """
         Same as get_holding_values_on(), except only the value is returned and
@@ -2983,7 +3001,11 @@ class Broker(MapToCountry, DatewiseLog):
                                    f"{entity_id} which has a lot in broker "
                                    f"{self.broker_id}.")
 
-            new_share_price = txn.cost_per_unit
+            if isinstance(txn, _BuyTransaction) and not for_taxation:
+                new_share_price = txn.cost_per_unit_in_broker_doc
+            else:
+                new_share_price = txn.cost_per_unit
+
             before_key = txn.txn_id + "_before"
             after_key = txn.txn_id + "_after"
 
@@ -3008,6 +3030,7 @@ class Broker(MapToCountry, DatewiseLog):
     def get_total_stock_holding_values_on(
         self,
         date: Date,
+        for_taxation: bool,
     ) -> OrderedDict[str, Fraction]:
         """
         Same as get_specific_entity_total_holding_values_on(), but sum total of
@@ -3021,7 +3044,7 @@ class Broker(MapToCountry, DatewiseLog):
         for entity_id in self._lots.keys():
             all_entity_holding_values[entity_id] = (
                 self.get_specific_entity_total_holding_values_on(
-                    date, entity_id
+                    date, entity_id, for_taxation
                 )
             )
 
@@ -3101,6 +3124,7 @@ class Broker(MapToCountry, DatewiseLog):
     def get_portfolio_values_on(
         self,
         date: Date,
+        for_taxation: bool,
     ) -> OrderedDict[str, Fraction]:
         """
         Combined portfolio value -> cash + stock values.
@@ -3112,7 +3136,8 @@ class Broker(MapToCountry, DatewiseLog):
         warnings and considerations apply to the use of this function.
         """
         cash_balances = self.get_cash_balances_on(date)
-        stock_values = self.get_total_stock_holding_values_on(date)
+        stock_values = self.get_total_stock_holding_values_on(date,
+                                                              for_taxation)
 
         total_portfolio_values = OrderedDict()
         total_portfolio_values["__opening"] = (
@@ -3177,7 +3202,7 @@ class Broker(MapToCountry, DatewiseLog):
 
     def get_peak_portfolio_value_on(self, date: Date) -> Fraction:
         """Don't use for taxation."""
-        portfolio_values = self.get_portfolio_values_on(date)
+        portfolio_values = self.get_portfolio_values_on(date, False)
         return max(portfolio_values.values())
 
     @property
@@ -3199,7 +3224,7 @@ class Broker(MapToCountry, DatewiseLog):
     @property
     def closing_portfolio_value_native_in_calendar_year(self) -> Fraction:
         """Don't use for taxation."""
-        portfolio_values = self.get_portfolio_values_on(cy_end())
+        portfolio_values = self.get_portfolio_values_on(cy_end(), False)
         return portfolio_values["__closing"]
 
     @property
@@ -3536,6 +3561,9 @@ def parse_opening_ledger() -> None:
                     units=activity_dict["remaining_units"],
                     cost_per_unit=acq_dict["stock_price_merchant_fmv"],
                     merchant_ttbr_if_vest=acq_dict["merchant_ttbr"],
+                    broker_cost_per_unit_if_vest=(
+                        activity_dict["stock_price_in_broker_doc"]
+                    ),
                     for_opening_lot=True,
                 )
 
@@ -3575,6 +3603,9 @@ def parse_main_activities() -> None:
                     units=activity_dict["units"],
                     cost_per_unit=activity_dict["stock_price_merchant_fmv"],
                     merchant_ttbr_if_vest=activity_dict["merchant_ttbr"],
+                    broker_cost_per_unit_if_vest=(
+                        activity_dict["stock_price_in_broker_doc"]
+                    ),
                 )
 
             case "buy":
@@ -3810,8 +3841,9 @@ def create_schedule_fa_table_a3() -> None:
                     "Nature of entity": entity.nature,
 
                     "Date of acquiring the interest": buy_txn.date.isoformat(),
-                    "Initial value of the investment":
-                        int(buy_txn.total_buy_value_inr_for_initial_acquire),
+                    "Initial value of the investment": int(
+                        buy_txn.total_buy_value_inr_for_initial_acquire_non_tax
+                    ),
 
                     "Peak value of investment during the Period":
                         int(lot.peak_holding_value_inr_in_calendar_year),

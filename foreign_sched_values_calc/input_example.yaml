@@ -353,8 +353,9 @@ opening_ledger_on_12_AM_jan_1_prev_fy:
         remaining_units: 30
         initial_acquisition:
             date: 2022-05-15
-            stock_price_merchant_fmv: 133.7  # FMV used by merchant banker.
-            merchant_ttbr: 75.57             # TTBR used by merchant banker.
+            stock_price_in_broker_doc: 128.79  # Stock price shown on Fidelity.
+            stock_price_merchant_fmv: 133.7    # FMV used by merchant banker.
+            merchant_ttbr: 75.57               # TTBR used by merchant banker.
 
     - STOCK_vest_prev_2:  # See "Note 1".
         activity_type: vest
@@ -422,8 +423,9 @@ activity_from_jan_1_prev_fy_to_31_mar_current_fy:
         date: 2024-05-15
         entity: STOCK
         units: 50
-        stock_price_merchant_fmv: 180.84  # FMV used by merchant banker.
-        merchant_ttbr: 82.10              # TTBR used by merchant banker.
+        stock_price_in_broker_doc: 178.95  # Stock price shown on Fidelity.
+        stock_price_merchant_fmv: 180.84   # FMV used by merchant banker.
+        merchant_ttbr: 82.10               # TTBR used by merchant banker.
 
     # In this example, earliest units are from earlier stock vests, whereas
     # sell-to-cover after vesting sells from the newly vested lot and not
