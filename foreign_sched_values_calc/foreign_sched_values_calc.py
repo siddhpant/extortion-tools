@@ -3573,10 +3573,8 @@ def parse_opening_ledger() -> None:
     PARSING_OPENING_LEDGER = False
 
 
-def parse_main_activities() -> None:
-    main_activity_key = "activity_from_jan_1_prev_fy_to_31_mar_current_fy"
-
-    for activity in input_dict[main_activity_key]:
+def _parse_main_activities(activity_key: str) -> None:
+    for activity in input_dict[activity_key]:
         activity_id, activity_type, activity_dict, entity, broker = \
             get_activity_values(activity)
 
@@ -3677,8 +3675,16 @@ def parse_main_activities() -> None:
             case _:
                 raise ValueError(
                     f"Unsupported activity_type {activity_type} in "
-                    f"{main_activity_key}."
+                    f"{activity_key}."
                 )
+
+
+def parse_main_activities() -> None:
+    for activity_key in (
+        "activity_from_jan_1_prev_fy_to_31_mar_prev_fy",
+        "activity_from_apr_1_current_fy_to_31_mar_current_fy",
+    ):
+        _parse_main_activities(activity_key)
 
 
 ###############################################################################

@@ -382,13 +382,14 @@ opening_ledger_on_12_AM_jan_1_prev_fy:
 ###############################################################################
 
 
-# If filing tax for FY2024-2025 (Apr 2024 to Mar 2025), you have to specify the
-# activities from 1 Jan 2024 (not 1 Apr) to 31 Mar 2025. We did open ledger at
-# 1st Jan. We need to do since 1 Jan to calculate for schedule FA which uses
-# calendar year, even if tax has been paid for previous FY.
+# Specify previous FY last qtr activity in this section. That is, if filing tax
+# for FY2024-2025 (Apr 2024 to Mar 2025), you have to specify the activities
+# from 1 Jan 2024 (not 1 Apr) to 31 Mar 2024 in this section. We did open the
+# ledger at 1st Jan. We need to do since 1 Jan to calculate for schedule FA
+# which uses calendar year, even if tax has been paid for previous FY.
 #
 # NOTE: ORDER IS IMPORTANT FOR THIS ONE. Hence leading "-" to enforce list.
-activity_from_jan_1_prev_fy_to_31_mar_current_fy:
+activity_from_jan_1_prev_fy_to_31_mar_prev_fy:
     - robinhood_add_cash_1:  # See "Note 1".
         activity_type: bank_to_cash
         broker: robinhood_personal
@@ -415,8 +416,16 @@ activity_from_jan_1_prev_fy_to_31_mar_current_fy:
             amount: 0
         misc_fees: 0  # Must specify any other fees charged, even if 0.
 
-    ##################### FY taxable activity starts now! #####################
 
+###############################################################################
+
+
+# Specify current FY taxable activity in this section. That is, if filing tax
+# for FY2024-2025 (Apr 2024 to Mar 2025), you have to specify the activities
+# from 1 Apr 2024 to 31 Mar 2024 in this section.
+#
+# NOTE: ORDER IS IMPORTANT FOR THIS ONE. Hence leading "-" to enforce list.
+activity_from_apr_1_current_fy_to_31_mar_current_fy:
     - STOCK_vest_new:  # See "Note 1".
         activity_type: vest
         broker: fidelity_rsu
