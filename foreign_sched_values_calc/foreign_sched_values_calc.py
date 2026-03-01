@@ -113,8 +113,6 @@ def fetch_input() -> None:
 
 
 def fetch_fx_rates() -> None:
-    global ttbr_dict
-
     if fx_rate_repo_dir.exists():
         subprocess.check_output(["git", "pull", "--ff-only"],
                                 cwd=fx_rate_repo_dir)
@@ -288,8 +286,6 @@ class Country(_BasePostInit):
         dataclass_field(init=False, default_factory=dict)
 
     def __post_init__(self) -> None:
-        global countries
-
         ensure_unique_yaml_key(self.country_id)
 
         if not self.name:
@@ -655,8 +651,6 @@ class Entity(MapToCountry):
                                  f"for entity '{self.entity_id}').")
 
     def __post_init__(self) -> None:
-        global entities, seen_tickers
-
         super().__post_init__()
         ensure_unique_yaml_key(self.entity_id)
 
@@ -898,8 +892,6 @@ class _Transaction(MapToEntity, _TotalValueMixin):
     txn_id: str
 
     def __post_init__(self) -> None:
-        global all_transactions
-
         super().__post_init__()
 
         if self.txn_id.startswith("__"):
@@ -922,8 +914,6 @@ class _ShareTransaction(_Transaction):
     cost_per_unit: Fraction
 
     def __post_init__(self) -> None:
-        global all_share_transactions
-
         super().__post_init__()
 
         if self.units <= 0:
@@ -1176,8 +1166,6 @@ class _CashTransaction(_Transaction, _TotalValueMixin):
     amount: Fraction
 
     def __post_init__(self) -> None:
-        global all_cash_transactions
-
         super().__post_init__()
 
         if self.amount <= 0:
@@ -2440,8 +2428,6 @@ class Broker(MapToCountry, DatewiseLog):
         raise RuntimeError("Code error - we should not be here!")
 
     def __post_init__(self) -> None:
-        global brokers
-
         super().__post_init__()
         ensure_unique_yaml_key(self.broker_id)
 
@@ -4059,8 +4045,6 @@ def create_schedule_fsi_and_form_67(avg_tax_rate: Fraction) -> None:
         income_value: Fraction,
         tax_withheld: Fraction,
     ) -> None:
-        nonlocal fsi_csv_rows
-
         income_type_mapping = {"ltcg": "LTCG", "stcg": "STCG",
                                "dividend": "Dividend"}
 
