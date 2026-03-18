@@ -422,7 +422,7 @@ activity_from_jan_1_prev_fy_to_31_mar_prev_fy:
 
 # Specify current FY taxable activity in this section. That is, if filing tax
 # for FY2024-2025 (Apr 2024 to Mar 2025), you have to specify the activities
-# from 1 Apr 2024 to 31 Mar 2024 in this section.
+# from 1 Apr 2024 to 31 Mar 2025 in this section.
 #
 # NOTE: ORDER IS IMPORTANT FOR THIS ONE. Hence leading "-" to enforce list.
 activity_from_apr_1_current_fy_to_31_mar_current_fy:
