@@ -690,6 +690,14 @@ class Entity(MapToCountry):
         return self.entity_type in ("cash_parking_mmf", "cash_wallet")
 
     @property
+    def equity_type(self) -> bool:
+        return self.entity_type == "stock"
+
+    @property
+    def debt_type(self) -> bool:
+        return not (self.equity_type or self.cash_type)
+
+    @property
     def nature(self) -> str:
         match self.entity_type:
             case "stock":
@@ -1183,7 +1191,10 @@ class SellTransaction(_ShareTransaction, _TaxWithholdingAndFees):
             - https://pib.gov.in/PressReleaseIframePage.aspx?PRID=2036604
             - https://zerodha.com/varsity/chapter/foreign-stocks-and-taxation/
         """
-        return more_than_two_years(self.date, self.buy_txn_obj.date)
+        return (
+            self.entity.equity_type
+            and more_than_two_years(self.date, self.buy_txn_obj.date)
+        )
 
     @property
     def is_short_term(self) -> bool:
