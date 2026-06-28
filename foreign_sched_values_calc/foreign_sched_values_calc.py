@@ -4138,6 +4138,10 @@ def create_schedule_fa_table_a3() -> None:
                 entity = lot.entity
                 buy_txn = lot.buy_txn_obj
 
+                # Do not include later purchases.
+                if buy_txn.date > cy_end():
+                    continue
+
                 csv_rows.append({
                     "Country/Region name": country.name,
                     "Country Name and Code": country.code,
