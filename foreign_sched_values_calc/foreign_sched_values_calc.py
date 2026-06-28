@@ -1256,6 +1256,12 @@ class _CashTransaction(_Transaction, _TotalValueMixin):
     def gross_total_value_native(self) -> Fraction:
         return self.amount
 
+    @property
+    def gross_total_value_inr_for_tax(self) -> Fraction:
+        return self.country.convert_to_inr_for_tax(
+            self.date, self.gross_total_value_native
+        )
+
 
 @dataclass(kw_only=True)
 class CashCreditTransaction(_CashTransaction, _TaxWithholdingAndFees):
@@ -1425,14 +1431,14 @@ class DividendTracker(_TransactionTracker):
                 "there already exists a dividend on that date."
             )
 
-    def net_total_value_inr_for_tax_between_dates(
+    def gross_total_value_inr_for_tax_between_dates(
         self,
         from_date: Date,
         to_date: Date,
         filter_cb: Callable[[_Transaction], bool] = lambda _: True,
     ) -> Fraction:
         return self._sum_txn_attr_between_dates(
-            "net_total_value_inr_for_tax", from_date, to_date, filter_cb
+            "gross_total_value_inr_for_tax", from_date, to_date, filter_cb
         )
 
     def total_tax_withheld_inr_between_dates(
@@ -1445,14 +1451,14 @@ class DividendTracker(_TransactionTracker):
             "tax_withheld_inr", from_date, to_date, filter_cb
         )
 
-    def net_total_amount_inr_for_which_tax_was_withheld_between_dates(
+    def gross_total_amount_inr_for_which_tax_was_withheld_between_dates(
         self,
         from_date: Date,
         to_date: Date,
         filter_cb: Callable[[_Transaction], bool] = lambda _: True,
     ) -> Fraction:
         return self._sum_txn_attr_between_dates(
-            "net_total_value_inr_for_tax",
+            "gross_total_value_inr_for_tax",
             from_date,
             to_date,
             lambda txn: (txn.tax_withholding_amount_native != 0
@@ -2032,7 +2038,7 @@ class ShareLot(MapToEntity, DatewiseLog):
 
     @property
     def total_dividends_inr_in_financial_year_for_tax(self) -> Fraction:
-        return self.dividends.net_total_value_inr_for_tax_between_dates(
+        return self.dividends.gross_total_value_inr_for_tax_between_dates(
             fy_start(), fy_end()
         )
 
@@ -2112,7 +2118,7 @@ class ShareLot(MapToEntity, DatewiseLog):
     def dividend_amount_inr_for_which_tax_was_withheld_in_financial_year(
         self
     ) -> Fraction:
-        return self.dividends.net_total_amount_inr_for_which_tax_was_withheld_between_dates(  # noqa: E501
+        return self.dividends.gross_total_amount_inr_for_which_tax_was_withheld_between_dates(  # noqa: E501
             fy_start(), fy_end()
         )
 
@@ -2165,7 +2171,7 @@ class ShareLot(MapToEntity, DatewiseLog):
         func_name = f"date_in_fy_advance_tax_installment_{installment}"
         date_in_installment = globals()[func_name]
 
-        return self.dividends.net_total_value_inr_for_tax_between_dates(
+        return self.dividends.gross_total_value_inr_for_tax_between_dates(
             fy_start(), fy_end(), lambda txn: date_in_installment(txn.date)
         )
 
@@ -2411,7 +2417,7 @@ class CashWallet(MapToEntity, DatewiseLog):
 
     @property
     def total_dividends_inr_in_financial_year_for_tax(self) -> Fraction:
-        return self.dividends.net_total_value_inr_for_tax_between_dates(
+        return self.dividends.gross_total_value_inr_for_tax_between_dates(
             fy_start(), fy_end()
         )
 
@@ -2427,7 +2433,7 @@ class CashWallet(MapToEntity, DatewiseLog):
     def dividend_amount_inr_for_which_tax_was_withheld_in_financial_year(
         self
     ) -> Fraction:
-        return self.dividends.net_total_amount_inr_for_which_tax_was_withheld_between_dates(  # noqa: E501
+        return self.dividends.gross_total_amount_inr_for_which_tax_was_withheld_between_dates(  # noqa: E501
             fy_start(), fy_end()
         )
 
@@ -2438,7 +2444,7 @@ class CashWallet(MapToEntity, DatewiseLog):
         func_name = f"date_in_fy_advance_tax_installment_{installment}"
         date_in_installment = globals()[func_name]
 
-        return self.dividends.net_total_value_inr_for_tax_between_dates(
+        return self.dividends.gross_total_value_inr_for_tax_between_dates(
             fy_start(), fy_end(), lambda txn: date_in_installment(txn.date)
         )
 
