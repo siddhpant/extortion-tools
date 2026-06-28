@@ -4013,6 +4013,17 @@ def format_address_for_csv(address: str) -> str:
     return address.replace("\n", ", ").replace(", ", "; ")
 
 
+def save_csv_rows(rows: list[dict[str, Any]], file_path: Path) -> None:
+    with open(file_path, "w") as f:
+        if not rows:
+            f.write("")
+            return
+
+        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+        writer.writeheader()
+        writer.writerows(rows)
+
+
 def create_schedule_fa_table_a2() -> None:
     """
     This section is basically due to babudom's lazy engineering, and made worse
@@ -4111,11 +4122,7 @@ def create_schedule_fa_table_a2() -> None:
         csv_rows += broker_rows
 
     csv_path = output_dir / "schedule_fa_table_a2.csv"
-
-    with open(csv_path, "w") as f:
-        writer = csv.DictWriter(f, fieldnames=list(csv_rows[0].keys()))
-        writer.writeheader()
-        writer.writerows(csv_rows)
+    save_csv_rows(csv_rows, csv_path)
 
     rel_path = csv_path.relative_to(Path(__file__).parent)
     print(f"Schedule FA Table A2 stored in {rel_path}")
@@ -4159,11 +4166,7 @@ def create_schedule_fa_table_a3() -> None:
                 })
 
     csv_path = output_dir / "schedule_fa_table_a3.csv"
-
-    with open(csv_path, "w") as f:
-        writer = csv.DictWriter(f, fieldnames=list(csv_rows[0].keys()))
-        writer.writeheader()
-        writer.writerows(csv_rows)
+    save_csv_rows(csv_rows, csv_path)
 
     rel_path = csv_path.relative_to(Path(__file__).parent)
     print(f"Schedule FA Table A3 stored in {rel_path}")
@@ -4493,22 +4496,14 @@ def create_schedule_fsi_and_form_67(avg_tax_rate: Fraction) -> None:
             add_to_form67(*args)
 
     fsi_csv_path = output_dir / "schedule_fsi.csv"
-
-    with open(fsi_csv_path, "w") as f:
-        writer = csv.DictWriter(f, fieldnames=list(fsi_csv_rows[0].keys()))
-        writer.writeheader()
-        writer.writerows(fsi_csv_rows)
+    save_csv_rows(fsi_csv_rows, fsi_csv_path)
 
     fsi_rel_path = fsi_csv_path.relative_to(Path(__file__).parent)
     print("Schedule FSI partially filled for reference stored in "
           f"{fsi_rel_path}")
 
     form67_csv_path = output_dir / "form_67.csv"
-
-    with open(form67_csv_path, "w") as f:
-        writer = csv.DictWriter(f, fieldnames=list(form67_csv_rows[0].keys()))
-        writer.writeheader()
-        writer.writerows(form67_csv_rows)
+    save_csv_rows(form67_csv_rows, form67_csv_path)
 
     form67_rel_path = form67_csv_path.relative_to(Path(__file__).parent)
     print()
