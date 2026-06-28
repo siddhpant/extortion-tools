@@ -3716,7 +3716,7 @@ def parse_opening_ledger() -> None:
                     cost_per_unit=acq_dict["stock_price_merchant_fmv"],
                     merchant_ttbr_if_vest=acq_dict["merchant_ttbr"],
                     broker_cost_per_unit_if_vest=(
-                        activity_dict["stock_price_in_broker_doc"]
+                        acq_dict["stock_price_in_broker_doc"]
                     ),
                     for_opening_lot=True,
                 )
