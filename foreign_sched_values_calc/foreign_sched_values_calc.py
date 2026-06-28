@@ -3032,16 +3032,7 @@ class Broker(MapToCountry, DatewiseLog):
         You MUST read docstring for get_holding_values_on(). Same warnings and
         considerations apply to the use of this function.
         """
-        all_lot_holding_values = []
-
-        for loop_entity_id, lot_map in self._lots.items():
-            if loop_entity_id == entity_id:
-                for lot in lot_map.values():
-                    all_lot_holding_values.append(
-                        lot.get_holding_values_on(date)
-                    )
-
-        if not all_lot_holding_values:
+        if entity_id not in self._lots:
             raise ValueError(f"No lots found for entity {entity_id}")
 
         units = ZERO
@@ -3051,7 +3042,24 @@ class Broker(MapToCountry, DatewiseLog):
         entity_holding_values["__opening"] = ZERO
         entity_holding_values["__closing"] = ZERO
 
+        all_lot_holding_values = []
+
+        for lot in self._lots[entity_id].values():
+            hv = lot.get_holding_values_on(date)
+
+            # We exclude fully-sold lots.
+            if (
+                len(hv.keys()) == 3
+                and hv["__opening"][0] == 0
+                and hv["__highest_intraday"][0] == 0
+                and hv["__closing"][0] == 0
+            ):
+                continue
+
+            all_lot_holding_values.append(hv)
+
         if not all_lot_holding_values:  # Nothing held.
+            entity_holding_values["__highest_intraday"] = ZERO
             return entity_holding_values
 
         for hv in all_lot_holding_values:
@@ -3135,17 +3143,27 @@ class Broker(MapToCountry, DatewiseLog):
         all_entity_holding_values = {}
 
         for entity_id in self._lots.keys():
-            all_entity_holding_values[entity_id] = (
-                self.get_specific_entity_total_holding_values_on(
-                    date, entity_id, for_taxation
-                )
+            hv = self.get_specific_entity_total_holding_values_on(
+                date, entity_id, for_taxation
             )
+
+            # We exclude fully-sold lots.
+            if (
+                len(hv.keys()) == 3
+                and hv["__opening"] == 0
+                and hv["__highest_intraday"] == 0
+                and hv["__closing"] == 0
+            ):
+                continue
+
+            all_entity_holding_values[entity_id] = hv
 
         combined_holding_values = OrderedDict()
         combined_holding_values["__opening"] = ZERO
         combined_holding_values["__closing"] = ZERO
 
         if not all_entity_holding_values:  # Nothing held.
+            combined_holding_values["__highest_intraday"] = ZERO
             return combined_holding_values
 
         for hv in all_entity_holding_values.values():
