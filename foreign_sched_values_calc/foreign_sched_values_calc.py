@@ -3903,24 +3903,15 @@ def create_prefilled_yaml_for_next_year() -> None:
     # Let's fill up the activities in next CY before the next FY start. We can
     # just copy what the user gave, no need to determine the values ourselves.
 
-    input_txn_id_to_entry_dict = dict(
-        tuple(entry_dict.items())[0]  # (key, value)
-        for entry_dict in input_dict[
-            "activity_from_apr_1_current_fy_to_31_mar_current_fy"
-        ]
-    )
-
     jan1_to_mar31_entries = []
     end_date = next_fy_start() - timedelta(days=1)
 
-    for txn_id, txn in all_transactions.items():
-        if not (start_date <= txn.date <= end_date):
-            continue
-
-        cleaned_txn_id = txn_id.split("//")[0]
-        jan1_to_mar31_entries.append({
-            cleaned_txn_id: input_txn_id_to_entry_dict[cleaned_txn_id]
-        })
+    for entry_dict in input_dict[
+        "activity_from_apr_1_current_fy_to_31_mar_current_fy"
+    ]:
+        activity_id, activity_dict = tuple(entry_dict.items())[0]
+        if start_date <= activity_dict["date"] <= end_date:
+            jan1_to_mar31_entries.append(deepcopy(entry_dict))
 
     next_year_yaml["activity_from_jan_1_prev_fy_to_31_mar_prev_fy"] = (
         jan1_to_mar31_entries
