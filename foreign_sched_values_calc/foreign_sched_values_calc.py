@@ -1881,9 +1881,9 @@ class ShareLot(MapToEntity, DatewiseLog):
         If the sell price was higher than both opening and peak, that becomes
         the peak value.
 
-        If there was no transaction in the day, then only in this case we know
-        the high price, which will be added in the "__highest_intraday" key,
-        which will be 0 if we don't have opening units.
+        If there was no share transaction in the day, then only in this case we
+        know the high price, which will be added in the "__highest_intraday"
+        key, which will be 0 if we don't have opening units.
 
         Since dict is ordered, the last value is the closing value.
 
@@ -1914,10 +1914,11 @@ class ShareLot(MapToEntity, DatewiseLog):
             )
             holding_values["__opening"] = (units, units * opening_price)
 
-        all_txns = self.get_all_txns_on(date)
+        all_share_txns = [txn for txn in self.get_all_txns_on(date).values()
+                          if isinstance(txn, _ShareTransaction)]
 
-        if not all_txns:
-            # No transaction happened. We can use the high value.
+        if not all_share_txns:
+            # No share transaction happened. We can use the high value.
             if units == 0:
                 # Explicit case for clarity. We avoid the function call.
                 total_high_price = ZERO
@@ -1930,7 +1931,7 @@ class ShareLot(MapToEntity, DatewiseLog):
             holding_values["__highest_intraday"] = (units, total_high_price)
         else:
             # Walk through this lot’s transactions for the given date.
-            for idx, txn in enumerate(all_txns.values()):
+            for idx, txn in enumerate(all_share_txns):
                 before_key = txn.txn_id + "_before"
                 after_key = txn.txn_id + "_after"
 
