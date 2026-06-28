@@ -297,7 +297,11 @@ def date_range(
 
 
 def more_than_two_years(sell_date: Date, buy_date: Date) -> bool:
-    """A month/year in income tax is a calendar month/year, not day count."""
+    """
+    A month/year in income tax is a calendar month/year, not day count.
+    If you buy at 15/03/2024, selling at 15/03/2026 would be more than 2y.
+    Proof: https://www.incometaxindia.gov.in/period-of-holding-of-capital-asset
+    """
     year_plus_two = buy_date.year + 2
 
     if (buy_date.month == 2) and (buy_date.day == 29):
