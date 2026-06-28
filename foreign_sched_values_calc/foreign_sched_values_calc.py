@@ -1208,7 +1208,7 @@ class SellTransaction(_ShareTransaction, _TaxWithholdingAndFees):
             return ZERO
 
         if self.is_long_term:
-            tax = self.gain_amount_inr_for_tax * 0.125
+            tax = self.gain_amount_inr_for_tax * Fraction(1, 8)  # 0.125
         else:
             slab_rate = metadata_dict["slab_rate_percent_for_stcg"] / 100
             tax = self.gain_amount_inr_for_tax * slab_rate
