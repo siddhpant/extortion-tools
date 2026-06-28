@@ -2688,11 +2688,27 @@ class Broker(MapToCountry, DatewiseLog):
             tax_withholding_rate=tax_withheld_rate,
         )
 
-        all_lots = [lot for lot in self._lots[entity_id].values()
-                    if lot.remaining_units != 0]
+        # Compute the (lot, units) pair for selling.
+        lots_to_sell = []
+        units_left = units
+
+        for lot in self._lots[entity_id].values():
+            if lot.remaining_units == 0:
+                continue
+
+            units_to_sell = min(units_left, lot.remaining_units)
+            lots_to_sell.append((lot, units_to_sell))
+
+            units_left -= units_to_sell
+            if units_left == 0:
+                break
+
+        if units_left != 0:
+            raise RuntimeError("Code didn't select all units, even though it "
+                               "checked for sufficiency earlier.")
 
         # Divide the fees paid among each sell transaction.
-        misc_fees_per_lot = misc_fees / len(all_lots)
+        misc_fees_per_lot = misc_fees / len(lots_to_sell)
 
         # Tax withholding cannot be calculated earlier, so we will calculate
         # later and sum it up in this variable.
@@ -2702,9 +2718,7 @@ class Broker(MapToCountry, DatewiseLog):
         # the last sell txn done.
         sell_txn = None
 
-        for lot in all_lots:
-            units_to_sell = min(units, lot.remaining_units)
-
+        for lot, units_to_sell in lots_to_sell:
             lot_sell_txn_id = txn_id + f"//FIFO_SELL_LOT_{lot.buy_txn_id}"
 
             # We cannot calculate tax withholding without knowing the gain,
@@ -2727,14 +2741,6 @@ class Broker(MapToCountry, DatewiseLog):
             self.add_txn_to_log(sell_txn)
 
             tax_withheld_in_loop += sell_txn.tax_withholding_amount_native
-            units -= units_to_sell
-
-            if units == 0:
-                break
-
-        if units != 0:
-            raise RuntimeError("Code didn't sell all units, even though it "
-                               "checked for sufficiency earlier.")
 
         # Due to rounding by broker, we may have a difference between the given
         # and calculated tax withholding. Let's ensure it's not more than the
