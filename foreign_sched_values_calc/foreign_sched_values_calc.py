@@ -2719,7 +2719,7 @@ class Broker(MapToCountry, DatewiseLog):
         # and calculated tax withholding. Let's ensure it's not more than the
         # typical lowest precision.
         calc_difference = tax_withholding_dict["amount"] - tax_withheld_in_loop
-        if calc_difference >= Fraction("0.01"):
+        if abs(calc_difference) >= Fraction("0.01"):
             raise ValueError("Calculated tax withheld when doing FIFO selling "
                              f"for {txn_id} doesn't match given tax withheld "
                              "(margin >= 0.01).")
@@ -2728,6 +2728,14 @@ class Broker(MapToCountry, DatewiseLog):
         # the last sell so that any broker rounding is accounted for.
         if sell_txn is not None:
             sell_txn.tax_withholding_amount_native += calc_difference
+            if sell_txn.tax_withholding_amount_native < 0:
+                # In case rounding resulted in negative number, we can end up
+                # with a negative number after subtraction.
+                raise RuntimeError(
+                    f"Calculated withholding becomes negative for {txn_id} "
+                    f"after accounting for difference due to broker rounding "
+                    f"(calc_difference = {calc_difference})."
+                )
 
         cash_txn_id = txn_id + "//GET_CASH_AFTER_SELL"
         self.add_cash(txn_id=cash_txn_id, date=date, amount=overall_net_amount,
