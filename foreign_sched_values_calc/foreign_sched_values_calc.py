@@ -2570,7 +2570,21 @@ class Broker(MapToCountry, DatewiseLog):
         misc_fees: Fraction,
     ) -> None:
         self._ensure_wallet_init()
+        new_entity = entities[new_entity_id]
         balance = self._wallet.balance
+
+        if not new_entity.cash_type:
+            raise ValueError(
+                f"The specified new cash entity {new_entity_id} for "
+                "cash_fund_switch is not a cash entity."
+            )
+
+        if new_entity.country_id != self.country_id:
+            raise ValueError(
+                f"Specified new cash entity {new_entity_id} of country "
+                f"{new_entity.country_id}, but broker {self.broker_id} is of "
+                f"country {self.country_id}."
+            )
 
         self.withdraw_cash(txn_id=f"{txn_id}//WITHDRAW_FOR_SWITCH",
                            date=date, amount=balance)
