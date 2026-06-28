@@ -4224,7 +4224,7 @@ def create_capital_gain_and_dividends_and_get_average_tax_rate() -> Fraction:
 
     rel_path = txt_path.relative_to(Path(__file__).parent)
 
-    print("\n\n")
+    print("\n")
     print(cleandoc(f"""
         Capital gain and dividend info for reference stored in {rel_path}
 
