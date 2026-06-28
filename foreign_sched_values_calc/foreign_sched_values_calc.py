@@ -65,6 +65,32 @@ ttbr_dict = {}
 ##############################################################################
 
 
+def check_duplicate_keys(loader, node, deep=False):
+    """
+    Source: https://github.com/yaml/pyyaml/issues/165#issuecomment-3689109906
+    Enforce error on duplicate keys on a given scope. The global key duplicates
+    for different nested dicts are checked later.
+    """
+    ret = loader.construct_mapping(node, deep=deep)
+    seen_keys = set()
+
+    for key_node, value_node in node.value:
+        if key_node.value in seen_keys:
+            raise ValueError(f"Duplicate YAML key {key_node.value} "
+                             + str(key_node.start_mark).strip())
+        else:
+            seen_keys.add(key_node.value)
+
+    return ret
+
+
+# Prevent duplicate keys.
+yaml.add_constructor(
+    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
+    check_duplicate_keys,
+    Loader=yaml.SafeLoader,
+)
+
 # Use Fraction for avoiding precision errors due to float.
 yaml.add_constructor(
     "tag:yaml.org,2002:float",
