@@ -3514,24 +3514,34 @@ class Broker(MapToCountry, DatewiseLog):
     def total_buy_sell_ltcg_tuple_inr_in_financial_year(
         self,
     ) -> tuple[Fraction, Fraction, Fraction]:
-        all_tuples = (
+        all_tuples = [
             lot.total_buy_sell_ltcg_tuple_inr_in_financial_year
             for lot_map in self._lots.values()
             for lot in lot_map.values()
-        )
-        total_tuple = tuple(sum(x) for x in zip(*all_tuples))
+        ]
+
+        if all_tuples:
+            total_tuple = tuple(sum(x) for x in zip(*all_tuples))
+        else:
+            total_tuple = (ZERO, ZERO, ZERO)
+
         return total_tuple
 
     @property
     def total_buy_sell_stcg_tuple_inr_in_financial_year(
         self,
     ) -> tuple[Fraction, Fraction, Fraction]:
-        all_tuples = (
+        all_tuples = [
             lot.total_buy_sell_stcg_tuple_inr_in_financial_year
             for lot_map in self._lots.values()
             for lot in lot_map.values()
-        )
-        total_tuple = tuple(sum(x) for x in zip(*all_tuples))
+        ]
+
+        if all_tuples:
+            total_tuple = tuple(sum(x) for x in zip(*all_tuples))
+        else:
+            total_tuple = (ZERO, ZERO, ZERO)
+
         return total_tuple
 
     def total_ltcg_amount_inr_for_advance_tax_installment(
