@@ -4124,6 +4124,16 @@ def create_prefilled_yaml_for_next_year() -> None:
 ###############################################################################
 
 
+def round_rs(rupees: Fraction) -> int:
+    """Convert Fraction() to rounded int."""
+    if rupees == 0:
+        return 0
+    elif rupees > 0:
+        return int(rupees + Fraction(1, 2))
+    else:
+        return int(rupees - Fraction(1, 2))
+
+
 def format_address_for_csv(address: str) -> str:
     """
     First we replace newlines with commas, to make address collapse into one
@@ -4208,9 +4218,9 @@ def create_schedule_fa_table_a2() -> None:
             "Account opening date": broker.account_opening_date.isoformat(),
 
             "Peak Balance During the Period":
-                int(broker.peak_portfolio_value_inr_in_calendar_year),
+                round_rs(broker.peak_portfolio_value_inr_in_calendar_year),
             "Closing balance":
-                int(broker.closing_portfolio_value_inr_in_calendar_year),
+                round_rs(broker.closing_portfolio_value_inr_in_calendar_year),
         }
 
         # From the ITR2 JSON schema, the nature field is specified by:
@@ -4224,12 +4234,12 @@ def create_schedule_fa_table_a2() -> None:
 
         broker_data_dividend = {
             "Nature of Amount": "D",
-            "Amount": int(broker.total_dividends_inr_in_calendar_year),
+            "Amount": round_rs(broker.total_dividends_inr_in_calendar_year),
         }
 
         broker_data_proceeds = {
             "Nature of Amount": "S",
-            "Amount": int(broker.total_sale_proceeds_inr_in_calendar_year),
+            "Amount": round_rs(broker.total_sale_proceeds_inr_in_calendar_year)
         }
 
         broker_rows = []
@@ -4278,19 +4288,19 @@ def create_schedule_fa_table_a3() -> None:
                     "Nature of entity": entity.nature,
 
                     "Date of acquiring the interest": buy_txn.date.isoformat(),
-                    "Initial value of the investment": int(
+                    "Initial value of the investment": round_rs(
                         buy_txn.total_buy_value_inr_for_initial_acquire_non_tax
                     ),
 
                     "Peak value of investment during the Period":
-                        int(lot.peak_holding_value_inr_in_calendar_year),
+                        round_rs(lot.peak_holding_value_inr_in_calendar_year),
                     "Closing balance":
-                        int(lot.closing_value_inr_in_calendar_year),
+                        round_rs(lot.closing_value_inr_in_calendar_year),
 
                     "Total gross amount paid/credited with respect to the holding during the period":  # noqa: E501
-                        int(lot.total_dividends_inr_in_calendar_year),
+                        round_rs(lot.total_dividends_inr_in_calendar_year),
                     "Total gross proceeds from sale or redemption of investment during the period":  # noqa: E501
-                        int(lot.total_sale_proceeds_inr_in_calendar_year),
+                        round_rs(lot.total_sale_proceeds_inr_in_calendar_year),
                 })
 
     csv_path = output_dir / "schedule_fa_table_a3.csv"
@@ -4507,12 +4517,13 @@ def create_schedule_fsi_and_form_67(avg_tax_rate: Fraction) -> None:
             "Country name": country.name,
 
             "Income type": income_type,
-            "Income value": int(income_value),
+            "Income value": round_rs(income_value),
 
             "Applicable tax rate in India (%)": avg_tax_rate_percent_str,
-            "Tax payable in India": max(0, int(income_value * avg_tax_rate)),
+            "Tax payable in India": max(0,
+                                        round_rs(income_value * avg_tax_rate)),
 
-            "Tax withheld outside India": int(tax_withheld),
+            "Tax withheld outside India": round_rs(tax_withheld),
             "Tax withholding rate (%)":
                 int(country_attr("tax_withholding_rate_percent_for")),
 
@@ -4540,9 +4551,9 @@ def create_schedule_fsi_and_form_67(avg_tax_rate: Fraction) -> None:
         dtaa_tax_rate_pc = country_attr("dtaa_tax_rate_percent")
         withholding_tax_rate_pc = country_attr("tax_withholding_rate_percent")
 
-        int_tax_in_india = int(income_value * avg_tax_rate)
-        int_tax_dtaa = int(income_value * dtaa_tax_rate_pc / 100)
-        int_tax_withheld = int(tax_withheld)  # Can potentially be > DTAA.
+        int_tax_in_india = round_rs(income_value * avg_tax_rate)
+        int_tax_dtaa = round_rs(income_value * dtaa_tax_rate_pc / 100)
+        int_tax_withheld = round_rs(tax_withheld)  # Can potentially be > DTAA.
 
         # Credit to claim must be the lowest >:(.
         int_credit_claimed = min(
@@ -4565,7 +4576,7 @@ def create_schedule_fsi_and_form_67(avg_tax_rate: Fraction) -> None:
             "Source of income": income_type_mapping[income_type_key],
             f"Please specify{space}": None,
 
-            "Income from outside India": int(income_value),
+            "Income from outside India": round_rs(income_value),
             "Amount": int_tax_withheld,
             "Rate(%)": format(withholding_tax_rate_pc, ".2f"),
 
