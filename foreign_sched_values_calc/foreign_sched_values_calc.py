@@ -3886,11 +3886,16 @@ def _parse_main_activities(
                 )
 
             case "bank_to_cash":
+                misc_fees = activity_dict.get("misc_fees", ZERO)
+                if misc_fees != ZERO:
+                    raise ValueError(f"Specified non-zero misc_fees for "
+                                     f"bank_to_cash txn {activity_id}.")
+
                 broker.add_cash(
                     txn_id=activity_id,
                     date=date,
                     amount=activity_dict["amount"],
-                    misc_fees=activity_dict["misc_fees"],
+                    misc_fees=ZERO,
                 )
 
             case "cash_to_bank":

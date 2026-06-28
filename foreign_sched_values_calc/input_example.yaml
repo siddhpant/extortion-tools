@@ -364,8 +364,9 @@ opening_ledger_on_12_AM_jan_1_prev_fy:
         remaining_units: 50
         initial_acquisition:
             date: 2023-12-31
-            stock_price_merchant_fmv: 100.4  # Same as above.
-            merchant_ttbr: 80.08             # Same as above.
+            stock_price_in_broker_doc: 100.0  # Same as above.
+            stock_price_merchant_fmv: 100.4   # Same as above.
+            merchant_ttbr: 80.08              # Same as above.
 
     - RANDOM_prev_buy:  # See "Note 1".
         activity_type: buy
