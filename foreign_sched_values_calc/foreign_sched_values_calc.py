@@ -3238,8 +3238,11 @@ class Broker(MapToCountry, DatewiseLog):
         # If no transaction happened for ANY cash or stock on this date, then
         # we can calculate the "__highest_intraday" value by simply summing it
         # up.
+        cash_balances_keys = list(cash_balances.keys())
         if (
-            list(cash_balances.keys()) == ["__opening", "__closing"]
+            len(cash_balances_keys) == 2
+            and cash_balances_keys[0].startswith("__opening_")
+            and cash_balances_keys[1].startswith("__closing_")
             and list(stock_values.keys()) == [
                 "__opening", "__highest_intraday", "__closing"
             ]
