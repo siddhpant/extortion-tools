@@ -2497,7 +2497,7 @@ class Broker(MapToCountry, DatewiseLog):
             return "BENEFICIAL_OWNER"
 
         if self.i_am_beneficiary:
-            return "BENIFICIARY"
+            return "BENIFICIARY"  # The spelling mistake is in ITD JSON schema.
 
         raise RuntimeError("Code error - we should not be here!")
 
