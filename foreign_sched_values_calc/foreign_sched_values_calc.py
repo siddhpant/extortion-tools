@@ -3876,11 +3876,25 @@ def create_prefilled_yaml_for_next_year() -> None:
                     # opening ledger of start_date.
                     continue
 
+                remaining_units = lot.opening_units_on(start_date)
+
+                # We should not include sold lots.
+                if remaining_units == 0:
+                    continue
+
+                # Sanity check.
+                if remaining_units < 0:
+                    raise RuntimeError(
+                        "In broker {broker_id} lot map, the lot for buy_txn "
+                        f"{buy_txn_id} contains negative remaining units "
+                        f"{remaining_units} on {start_date}."
+                    )
+
                 entry_dict = {
                     "activity_type": "vest" if buy_txn.vest else "buy",
                     "broker": broker_id,
                     "entity": buy_txn.entity_id,
-                    "remaining_units": lot.opening_units_on(start_date),
+                    "remaining_units": remaining_units,
                     "initial_acquisition": {
                         "date": buy_txn.date,
                         "stock_price_in_broker_doc":
