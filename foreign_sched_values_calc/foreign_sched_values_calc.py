@@ -4460,10 +4460,6 @@ def create_schedule_fsi_and_form_67(avg_tax_rate: Fraction) -> None:
         income_value: Fraction,
         tax_withheld: Fraction,
     ) -> None:
-        int_tax_in_india = int(income_value * avg_tax_rate)
-        int_tax_withheld = int(tax_withheld)
-        int_credit_claimed = min(int_tax_in_india, int_tax_withheld)
-
         income_type_mapping = {
             "ltcg": "Long term capital gain",
             "stcg": "Short term capital gain",
@@ -4473,9 +4469,16 @@ def create_schedule_fsi_and_form_67(avg_tax_rate: Fraction) -> None:
         def country_attr(attr: str) -> Any:
             return getattr(country, f"{attr}_{income_type_key}")
 
-        # We do not support tax rate different from DTAA rate as of now.
-        tax_rate_pc_outside_india = format(
-            country_attr("dtaa_tax_rate_percent"), ".2f"
+        dtaa_tax_rate_pc = country_attr("dtaa_tax_rate_percent")
+        withholding_tax_rate_pc = country_attr("tax_withholding_rate_percent")
+
+        int_tax_in_india = int(income_value * avg_tax_rate)
+        int_tax_dtaa = int(income_value * dtaa_tax_rate_pc / 100)
+        int_tax_withheld = int(tax_withheld)  # Can potentially be > DTAA.
+
+        # Credit to claim must be the lowest >:(.
+        int_credit_claimed = min(
+            int_tax_in_india, int_tax_dtaa, int_tax_withheld
         )
 
         # Since column names are same, the stupid engineer chose a trailing
@@ -4496,7 +4499,7 @@ def create_schedule_fsi_and_form_67(avg_tax_rate: Fraction) -> None:
 
             "Income from outside India": int(income_value),
             "Amount": int_tax_withheld,
-            "Rate(%)": tax_rate_pc_outside_india,
+            "Rate(%)": format(withholding_tax_rate_pc, ".2f"),
 
             "Tax payable on such income under normal provisions in India":
                 int_tax_in_india,
@@ -4505,7 +4508,7 @@ def create_schedule_fsi_and_form_67(avg_tax_rate: Fraction) -> None:
             "Article No. of Double Taxation Avoidance Agreements":
                 country_attr("dtaa_article"),
             "Rate of tax as per Double Taxation Avoidance Agreements(%)":
-                tax_rate_pc_outside_india,
+                format(dtaa_tax_rate_pc, ".2f"),
 
             f"Amount{space}": int_credit_claimed,
             "Credit claimed under section 91": 0,
