@@ -3779,16 +3779,35 @@ def parse_opening_ledger() -> None:
     PARSING_OPENING_LEDGER = False
 
 
-def _parse_main_activities(activity_key: str) -> None:
+def _parse_main_activities(
+    activity_key: str,
+    start_date: Date,
+    end_date: Date,
+) -> None:
+    prev_date = None
+
     for activity in input_dict[activity_key]:
         activity_id, activity_type, activity_dict, entity, broker = \
             get_activity_values(activity)
+
+        date = activity_dict["date"]
+
+        if not (start_date <= date <= end_date):
+            raise ValueError(f"{activity_id} dated {date} is in section "
+                             f"{activity_key} which only allows date range "
+                             f"{start_date} <= date <= {end_date}.")
+
+        if prev_date and date < prev_date:
+            raise ValueError(f"{activity_id} dated {date} but the previous "
+                             f"activity was dated {prev_date}.")
+        else:
+            prev_date = date
 
         match activity_type:
             case "vest":
                 broker.add_lot_buy(
                     txn_id=activity_id,
-                    date=activity_dict["date"],
+                    date=date,
                     entity_id=entity.entity_id,
                     units=activity_dict["units"],
                     cost_per_unit=activity_dict["stock_price_merchant_fmv"],
@@ -3801,7 +3820,7 @@ def _parse_main_activities(activity_key: str) -> None:
             case "buy":
                 broker.add_lot_buy(
                     txn_id=activity_id,
-                    date=activity_dict["date"],
+                    date=date,
                     entity_id=entity.entity_id,
                     units=activity_dict["units"],
                     cost_per_unit=activity_dict["stock_price_in_broker_doc"],
@@ -3810,7 +3829,7 @@ def _parse_main_activities(activity_key: str) -> None:
             case "stock_dividend":
                 broker.receive_stock_dividend(
                     txn_id=activity_id,
-                    date=activity_dict["date"],
+                    date=date,
                     entity_id=entity.entity_id,
                     amount=activity_dict["amount"],
                     misc_fees=activity_dict["misc_fees"],
@@ -3820,7 +3839,7 @@ def _parse_main_activities(activity_key: str) -> None:
             case "cash_dividend":
                 broker.receive_cash_dividend(
                     txn_id=activity_id,
-                    date=activity_dict["date"],
+                    date=date,
                     amount=activity_dict["amount"],
                     misc_fees=activity_dict["misc_fees"],
                     tax_withholding_dict=activity_dict["tax_withholding"],
@@ -3829,7 +3848,7 @@ def _parse_main_activities(activity_key: str) -> None:
             case "sell_fifo":
                 broker.sell_shares_fifo(
                     txn_id=activity_id,
-                    date=activity_dict["date"],
+                    date=date,
                     entity_id=entity.entity_id,
                     units=activity_dict["units"],
                     cost_per_unit=activity_dict["stock_price_in_broker_doc"],
@@ -3845,7 +3864,7 @@ def _parse_main_activities(activity_key: str) -> None:
                 broker.sell_shares_specific(
                     txn_id=activity_id,
                     buy_txn_id=activity_dict["unit_lot_key"],
-                    date=activity_dict["date"],
+                    date=date,
                     entity_id=entity.entity_id,
                     units=activity_dict["units"],
                     cost_per_unit=activity_dict["stock_price_in_broker_doc"],
@@ -3857,7 +3876,7 @@ def _parse_main_activities(activity_key: str) -> None:
             case "cash_fund_switch":
                 broker.cash_fund_switch(
                     txn_id=activity_id,
-                    date=activity_dict["date"],
+                    date=date,
                     new_entity_id=activity_dict["new_entity"],
                     misc_fees=activity_dict["misc_fees"],
                 )
@@ -3865,7 +3884,7 @@ def _parse_main_activities(activity_key: str) -> None:
             case "bank_to_cash":
                 broker.add_cash(
                     txn_id=activity_id,
-                    date=activity_dict["date"],
+                    date=date,
                     amount=activity_dict["amount"],
                     misc_fees=activity_dict["misc_fees"],
                 )
@@ -3873,7 +3892,7 @@ def _parse_main_activities(activity_key: str) -> None:
             case "cash_to_bank":
                 broker.withdraw_cash(
                     txn_id=activity_id,
-                    date=activity_dict["date"],
+                    date=date,
                     amount=activity_dict["amount"],
                     ghar_vaapsi=True,
                 )
@@ -3886,11 +3905,19 @@ def _parse_main_activities(activity_key: str) -> None:
 
 
 def parse_main_activities() -> None:
-    for activity_key in (
-        "activity_from_jan_1_prev_fy_to_31_mar_prev_fy",
-        "activity_from_apr_1_current_fy_to_31_mar_current_fy",
+    for activity_key, start_date, end_date in (
+        (
+            "activity_from_jan_1_prev_fy_to_31_mar_prev_fy",
+            cy_start(),
+            fy_start() - timedelta(days=1),
+        ),
+        (
+            "activity_from_apr_1_current_fy_to_31_mar_current_fy",
+            fy_start(),
+            fy_end(),
+        ),
     ):
-        _parse_main_activities(activity_key)
+        _parse_main_activities(activity_key, start_date, end_date)
 
 
 ###############################################################################
